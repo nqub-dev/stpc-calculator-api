@@ -1,24 +1,37 @@
 export default function handler(req, res) {
-  const { length, width, depth, messurmentSystem } = req.body;
-  const ft2 = messurmentSystem ? (length * width * 10.764) : (length * width);
-  const volume = Math.ceil((ft2 * depth) / 12);
-  const bags = [
-    { weight: "40lb", yield: 0.09 },
-    { weight: "80lb", yield: 0.18 }
-  ];
+  if (req.method !== "POST") return res.status(405).json({ error: "Only POST supported" });
 
-  const recommended = bags.map(b => ({
-    weight: b.weight,
-    count: Math.ceil(volume / b.yield),
-    safetyCount: Math.ceil(volume * 1.1 / b.yield)
-  }));
+  const { length, width, depth, messurmentSystem = false } = req.body;
+  const isMetric = messurmentSystem;
+  const volume = length * width * (depth / (isMetric ? 100 : 12));
+  const round = (n) => Math.round(n * 100) / 100;
 
-  res.status(200).json({
+  const result = {
     calculatorUsed: "resurfacing",
-    resultVolume: { value: volume, unit: "ft³" },
+    resultVolume: { value: round(volume), unit: isMetric ? "m³" : "ft³" },
     recommendedProduct: {
-      name: "Flo-Coat Resurfacer",
-      bags: recommended
-    }
-  });
+      name: "Flo-Coat® Resurfacer",
+      bags: [
+        {
+          weight: "40lb",
+          count: Math.ceil(volume / 0.4),
+          safetyCount: Math.ceil(volume * 1.1 / 0.4)
+        }
+      ]
+    },
+    otherProducts: [
+      {
+        name: "Sand Mix",
+        bags: [
+          {
+            weight: "60lb",
+            count: Math.ceil(volume / 0.45),
+            safetyCount: Math.ceil(volume * 1.1 / 0.45)
+          }
+        ]
+      }
+    ]
+  };
+
+  res.status(200).json(result);
 }

@@ -1,29 +1,48 @@
 export default function handler(req, res) {
-  const { numberOfPosts, inner, outer, depth, postShape, messurmentSystem } = req.body;
-  const inchToFt = (val) => messurmentSystem ? val / 30.48 : val / 12;
-  const radius = inchToFt(outer) / 2;
-  const holeVolume = postShape === 'round'
-    ? Math.PI * Math.pow(radius, 2) * inchToFt(depth)
-    : Math.pow(inchToFt(outer), 2) * inchToFt(depth);
+  if (req.method !== "POST") return res.status(405).json({ error: "Only POST supported" });
 
-  const totalVolume = Math.ceil(holeVolume * numberOfPosts);
-  const bags = [
-    { weight: "50lb", yield: 0.375 },
-    { weight: "60lb", yield: 0.6 }
-  ];
+  const { numberOfPosts, inner, outer, depth, postShape, messurmentSystem = false } = req.body;
+  const isMetric = messurmentSystem;
 
-  const recommended = bags.map(b => ({
-    weight: b.weight,
-    count: Math.ceil(totalVolume / b.yield),
-    safetyCount: Math.ceil(totalVolume * 1.1 / b.yield)
-  }));
+  let volume = 0;
+  if (postShape === "round") {
+    volume = ((depth * Math.PI * (Math.pow(outer / 2, 2) - Math.pow(inner / 2, 2))) /
+             (isMetric ? 1000000 : 1728)) * numberOfPosts;
+  } else if (postShape === "squared") {
+    volume = (((Math.PI * Math.pow(outer / 2, 2) - Math.pow(inner, 2)) * depth) /
+             (isMetric ? 1000000 : 1728)) * numberOfPosts;
+  } else {
+    return res.status(400).json({ error: "Invalid postShape" });
+  }
 
-  res.status(200).json({
+  const round = (n) => Math.round(n * 100) / 100;
+
+  const result = {
     calculatorUsed: "post-setting",
-    resultVolume: { value: totalVolume, unit: "ft³" },
+    resultVolume: { value: round(volume), unit: isMetric ? "m³" : "ft³" },
     recommendedProduct: {
       name: "Fast Setting Concrete Mix",
-      bags: recommended
-    }
-  });
+      bags: [
+        {
+          weight: "50lb",
+          count: Math.ceil(volume / 0.3),
+          safetyCount: Math.ceil(volume * 1.1 / 0.3)
+        }
+      ]
+    },
+    otherProducts: [
+      {
+        name: "5000 Plus Concrete Mix",
+        bags: [
+          {
+            weight: "80lb",
+            count: Math.ceil(volume / 0.6),
+            safetyCount: Math.ceil(volume * 1.1 / 0.6)
+          }
+        ]
+      }
+    ]
+  };
+
+  res.status(200).json(result);
 }
