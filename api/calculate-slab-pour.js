@@ -1,28 +1,38 @@
 export default function handler(req, res) {
-  if (req.method !== "POST") return res.status(405).json({ error: "Only POST supported" });
+  const { length, width, depth, messurmentSystem } = req.body;
+  const ft3 = messurmentSystem ? (length * width * (depth / 100)) * 35.3147 : length * width * (depth / 12);
+  const volume = Math.ceil(ft3);
+  const bags = [
+    { weight: "60lb", yield: 0.6 },
+    { weight: "80lb", yield: 0.8 }
+  ];
 
-  const { length, width, depth, messurmentSystem = false } = req.body;
-  const isMetric = messurmentSystem;
-  const volume = length * width * (depth / (isMetric ? 100 : 12));
-  const round = (n) => Math.round(n * 100) / 100;
+  const recommended = bags.map(b => ({
+    weight: b.weight,
+    count: Math.ceil(volume / b.yield),
+    safetyCount: Math.ceil(volume * 1.1 / b.yield)
+  }));
 
-  const result = {
+  const response = {
     calculatorUsed: "slab-pour",
-    resultVolume: { value: round(volume), unit: isMetric ? "m³" : "ft³" },
+    resultVolume: { value: volume, unit: "ft³" },
     recommendedProduct: {
       name: "High Strength Concrete Mix",
-      bags: [
-        { weight: "60lb", count: Math.ceil(volume / 0.45) },
-        { weight: "80lb", count: Math.ceil(volume / 0.6) }
-      ]
+      bags: recommended
     },
     otherProducts: [
       {
         name: "Fast Setting Concrete Mix",
-        bags: [{ weight: "50lb", count: Math.ceil(volume / 0.3) }]
+        bags: [
+          {
+            weight: "50lb",
+            count: Math.ceil(volume / 0.375),
+            safetyCount: Math.ceil(volume * 1.1 / 0.375)
+          }
+        ]
       }
     ]
   };
 
-  res.status(200).json(result);
+  res.status(200).json(response);
 }
